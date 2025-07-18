@@ -17,6 +17,7 @@
             --text-color: #e0e0e0;
             --text-muted: #a0a0a0;
             --border-color: rgba(255, 255, 255, 0.1);
+            --error-color: #cf6679;
         }
 
         * {
@@ -96,19 +97,34 @@
             color: var(--text-color);
             font-family: 'Inter', sans-serif;
             font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+        
+        input.invalid {
+            border-color: var(--error-color);
         }
         
         button {
             width: 100%;
             padding: 0.85rem;
-            background: linear-gradient(90deg, var(--primary-variant), var(--primary-color));
-            color: white;
             border: none;
             border-radius: 6px;
             font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
             transition: opacity 0.2s ease;
+        }
+
+        #search-btn {
+             background: linear-gradient(90deg, var(--primary-variant), var(--primary-color));
+             color: white;
+             margin-bottom: 1rem;
+        }
+        
+        #random-btn {
+            background: transparent;
+            color: var(--secondary-color);
+            border: 2px solid var(--secondary-color);
         }
         
         button:disabled {
@@ -126,6 +142,10 @@
             border-radius: 8px;
             margin-bottom: 1.5rem;
             border-left: 4px solid var(--primary-color);
+        }
+        
+        #results-info.error {
+            border-left-color: var(--error-color);
         }
 
         .loader {
@@ -214,33 +234,41 @@
             <h2>Find Breweries</h2>
             <form id="search-form">
                 <div class="form-group">
-                    <label for="location">Location</label>
-                    <input type="text" id="location" placeholder="City, Zip, or Address" required>
+                    <label for="location">Location (for distance search)</label>
+                    <input type="text" id="location" placeholder="City, Zip, or Address">
                 </div>
                 <div class="form-group">
-                    <label for="radius">Distance in Miles (Optional)</label>
+                    <label for="radius">Distance in Miles</label>
                     <input type="number" id="radius" placeholder="e.g., 10">
                 </div>
+                <hr style="border-color: var(--border-color); margin: 1.5rem 0;">
                 <div class="form-group">
-                    <label for="by_name">Filter by Name (Optional)</label>
-                    <input type="text" id="by_name" placeholder="e.g., Russian River">
+                    <label for="search-term">Search Term (Name, City, etc.)</label>
+                    <input type="text" id="search-term" placeholder="e.g., Bells Brewery">
                 </div>
                 <div class="form-group">
-                    <label for="by_type">Filter by Type (Optional)</label>
+                    <label for="by_type">Filter by Type</label>
                     <select id="by_type">
-                        <option value="">Any</option>
+                        <option value="">Any Type</option>
                         <option value="micro">Micro</option>
                         <option value="nano">Nano</option>
                         <option value="regional">Regional</option>
                         <option value="brewpub">Brewpub</option>
+                        <option value="contract">Contract</option>
+                        <option value="proprietor">Proprietor</option>
+                        <option value="planning">Planning</option>
+                        <option value="closed">Closed</option>
+                        <option value="large">Large (Deprecated)</option>
+                        <option value="bar">Bar (Deprecated)</option>
                     </select>
                 </div>
                 <button type="submit" id="search-btn">Search</button>
             </form>
+            <button id="random-btn">Discover a Random Brewery</button>
         </aside>
 
         <section class="results-panel">
-            <div id="results-info">Enter a location and hit search to begin.</div>
+            <div id="results-info">Enter a location or search term to begin.</div>
             <div class="loader">
                 <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><style>.spinner_DupU{animation:spinner_sM3D 1.2s linear infinite,spinner_E507 1.2s linear infinite}.spinner_GWtZ{animation:spinner_sM3D 1.2s linear infinite,spinner_f7Y2 1.2s linear infinite;animation-delay:.2s}.spinner_dwN6{animation:spinner_sM3D 1.2s linear infinite,spinner_o6b1 1.2s linear infinite;animation-delay:.4s}@keyframes spinner_sM3D{0%,50%{r:4px}100%{r:2px}}@keyframes spinner_E507{0%,50%{cx:7px}100%{cx:5px}}@keyframes spinner_f7Y2{0%,50%{cx:12px}100%{cx:10px}}@keyframes spinner_o6b1{0%,50%{cx:17px}100%{cx:15px}}</style><circle class="spinner_DupU" cx="7" cy="12" r="3" fill="#bb86fc"/><circle class="spinner_GWtZ" cx="12" cy="12" r="3" fill="#bb86fc"/><circle class="spinner_dwN6" cx="17" cy="12" r="3" fill="#bb86fc"/></svg>
             </div>
@@ -250,48 +278,34 @@
 
 <script>
     const breweryApiBase = 'https://api.openbrewerydb.org/v1/breweries';
-    // Using Nominatim for geocoding - no API key needed for light use.
-    // See usage policy: https://operations.osmfoundation.org/policies/nominatim/
     const geocodeApiBase = 'https://nominatim.openstreetmap.org/search';
     
     // --- DOM Elements ---
     const searchForm = document.getElementById('search-form');
     const searchBtn = document.getElementById('search-btn');
+    const randomBtn = document.getElementById('random-btn');
     const breweriesList = document.getElementById('breweries-list');
     const resultsInfo = document.getElementById('results-info');
     const loader = document.querySelector('.loader');
+    const searchTermInput = document.getElementById('search-term');
 
     // --- Utility Functions ---
-
-    /**
-     * Map of country names to ISO 3166-1 alpha-2 codes.
-     * This is not exhaustive but covers common cases in the database.
-     */
     const countryCodeMap = {
-        "United States": "us", "England": "gb", "Scotland": "gb", "Ireland": "ie",
+        "United States": "us", "England": "gb", "Scotland": "gb", "Wales": "gb", "Ireland": "ie",
         "South Korea": "kr", "Canada": "ca", "France": "fr", "Austria": "at",
         "Australia": "au", "Poland": "pl", "Portugal": "pt", "Mexico": "mx",
         "Brazil": "br", "Japan": "jp", "Isle of Man": "im", "New Zealand": "nz"
     };
 
-    /**
-     * Converts a country name to its corresponding flag emoji.
-     * @param {string} countryName - The full name of the country.
-     * @returns {string} The flag emoji or a globe as a fallback.
-     */
     function getFlagEmoji(countryName) {
         const code = countryCodeMap[countryName];
-        if (!code) return '🌍'; // Fallback to globe emoji
-
+        if (!code) return '🌍';
         const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
         return String.fromCodePoint(...codePoints);
     }
 
-    /**
-     * Calculates the distance between two lat/lon points in miles using the Haversine formula.
-     */
     function haversineDistance(lat1, lon1, lat2, lon2) {
-        const R = 3958.8; // Earth's radius in miles
+        const R = 3958.8;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
         const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -301,25 +315,17 @@
         return R * c;
     }
 
-    /**
-     * Geocodes a location string to latitude and longitude.
-     * @param {string} locationQuery - The user's location input.
-     * @returns {Promise<object|null>} An object with lat, lon, and displayName, or null.
-     */
     async function geocodeLocation(locationQuery) {
         const url = `${geocodeApiBase}?q=${encodeURIComponent(locationQuery)}&format=json&limit=1`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error('Geocoding network response was not ok.');
             const data = await response.json();
-            if (data && data.length > 0) {
-                return {
-                    lat: parseFloat(data[0].lat),
-                    lon: parseFloat(data[0].lon),
-                    displayName: data[0].display_name
-                };
-            }
-            return null;
+            return (data && data.length > 0) ? {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                displayName: data[0].display_name
+            } : null;
         } catch (error) {
             console.error("Geocoding Error:", error);
             return null;
@@ -330,14 +336,14 @@
 
     const setLoadingState = (isLoading) => {
         searchBtn.disabled = isLoading;
+        randomBtn.disabled = isLoading;
         loader.classList.toggle('active', isLoading);
-        if (isLoading) {
-            breweriesList.innerHTML = '';
-        }
+        resultsInfo.classList.remove('error');
+        if (isLoading) breweriesList.innerHTML = '';
     };
     
     const displayBreweries = (breweries, originCoords) => {
-        breweriesList.innerHTML = ''; // Clear previous results
+        breweriesList.innerHTML = '';
         if (breweries.length === 0) {
             breweriesList.innerHTML = '<p>No breweries found matching your criteria.</p>';
             return;
@@ -349,22 +355,13 @@
             
             let distanceHtml = '';
             if (originCoords && brewery.latitude && brewery.longitude) {
-                const distance = haversineDistance(
-                    originCoords.lat, originCoords.lon,
-                    brewery.latitude, brewery.longitude
-                );
+                const distance = haversineDistance(originCoords.lat, originCoords.lon, brewery.latitude, brewery.longitude);
                 distanceHtml = `<p class="distance">~ ${distance.toFixed(1)} miles away</p>`;
             }
 
             const flagEmoji = getFlagEmoji(brewery.country);
-            const countryHtml = `
-                <div class="country-info">
-                    <span class="flag-emoji">${flagEmoji}</span>${brewery.country || 'N/A'}
-                </div>`;
-            
-            const websiteHtml = brewery.website_url ?
-                `<a href="${brewery.website_url}" target="_blank" rel="noopener">Visit Website &rarr;</a>` : '';
-
+            const countryHtml = `<div class="country-info"><span class="flag-emoji">${flagEmoji}</span>${brewery.country || 'N/A'}</div>`;
+            const websiteHtml = brewery.website_url ? `<a href="${brewery.website_url}" target="_blank" rel="noopener">Visit Website &rarr;</a>` : '';
 
             card.innerHTML = `
                 <h3>${brewery.name}</h3>
@@ -375,71 +372,124 @@
                     <strong>Type:</strong> <span style="text-transform: capitalize;">${brewery.brewery_type || 'N/A'}</span>
                 </p>
                 ${countryHtml}
-                ${websiteHtml}
-            `;
+                ${websiteHtml}`;
             breweriesList.appendChild(card);
         });
     };
 
-    searchForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        setLoadingState(true);
-
-        const locationQuery = document.getElementById('location').value;
-        const radius = parseFloat(document.getElementById('radius').value);
-        const nameFilter = document.getElementById('by_name').value;
-        const typeFilter = document.getElementById('by_type').value;
-
+    async function handleLocationSearch(locationQuery, radius, searchTerm, typeFilter) {
         resultsInfo.textContent = `Finding coordinates for "${locationQuery}"...`;
         const originCoords = await geocodeLocation(locationQuery);
 
         if (!originCoords) {
-            resultsInfo.textContent = `❌ Could not find location: "${locationQuery}". Please try a different search.`;
-            setLoadingState(false);
+            resultsInfo.textContent = `❌ Could not find location: "${locationQuery}". Please try again.`;
+            resultsInfo.classList.add('error');
             return;
         }
         
-        resultsInfo.textContent = `Found "${originCoords.displayName}". Searching for nearby breweries...`;
-
-        const params = new URLSearchParams({
-            by_dist: `${originCoords.lat},${originCoords.lon}`,
-            per_page: 200
-        });
-        if(nameFilter) params.append('by_name', nameFilter);
+        resultsInfo.textContent = `Found "${originCoords.displayName}". Searching nearby...`;
+        const params = new URLSearchParams({ by_dist: `${originCoords.lat},${originCoords.lon}`, per_page: 200 });
+        if(searchTerm) params.append('by_name', searchTerm); // by_name can be combined with by_dist
         if(typeFilter) params.append('by_type', typeFilter);
 
         try {
             const response = await fetch(`${breweryApiBase}?${params.toString()}`);
-            if (!response.ok) throw new Error('Brewery API network response was not ok.');
+            if (!response.ok) throw new Error('Brewery API response not ok.');
             let breweries = await response.json();
             
             let filteredBreweries = breweries;
             if (!isNaN(radius) && radius > 0) {
-                 filteredBreweries = breweries.filter(b => {
-                    if (!b.latitude || !b.longitude) return false;
-                    const distance = haversineDistance(originCoords.lat, originCoords.lon, b.latitude, b.longitude);
-                    return distance <= radius;
-                });
+                 filteredBreweries = breweries.filter(b =>
+                    b.latitude && b.longitude && haversineDistance(originCoords.lat, originCoords.lon, b.latitude, b.longitude) <= radius
+                );
             }
             
             let infoText = `Showing ${filteredBreweries.length} results`;
-            if (nameFilter) infoText += ` with "${nameFilter}" in the name`;
+            if (searchTerm) infoText += ` with "${searchTerm}"`;
             if (!isNaN(radius) && radius > 0) infoText += ` within ${radius} miles of`;
             else infoText += ` nearest to`;
             infoText += ` "${originCoords.displayName.split(',')[0]}"`;
 
             resultsInfo.textContent = `✅ ${infoText}.`;
             displayBreweries(filteredBreweries, originCoords);
-
         } catch (error) {
             console.error("Error fetching breweries:", error);
             resultsInfo.textContent = "❌ An error occurred while fetching brewery data.";
-        } finally {
-            setLoadingState(false);
+            resultsInfo.classList.add('error');
         }
+    }
+    
+    async function handleGeneralSearch(searchTerm, typeFilter) {
+        // Use the powerful `/search` endpoint for fuzzy matching the search term
+        const url = `${breweryApiBase}/search?query=${encodeURIComponent(searchTerm)}&per_page=200`;
+        resultsInfo.textContent = `Searching for breweries matching "${searchTerm}"...`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Brewery API response not ok.');
+            let breweries = await response.json();
+            
+            // If a type filter is also applied, filter the results on the client-side
+            let filteredBreweries = breweries;
+            if (typeFilter) {
+                filteredBreweries = breweries.filter(b => b.brewery_type === typeFilter);
+            }
+
+            let infoText = `Showing ${filteredBreweries.length} results for "${searchTerm}"`;
+            if (typeFilter) infoText += ` of type "${typeFilter}"`;
+            resultsInfo.textContent = `✅ ${infoText}.`;
+            displayBreweries(filteredBreweries);
+        } catch (error) {
+            console.error("Error fetching breweries:", error);
+            resultsInfo.textContent = "❌ An error occurred while fetching brewery data.";
+            resultsInfo.classList.add('error');
+        }
+    }
+    
+    searchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setLoadingState(true);
+        searchTermInput.classList.remove('invalid');
+
+        const locationQuery = document.getElementById('location').value.trim();
+        const radius = parseFloat(document.getElementById('radius').value);
+        const searchTerm = document.getElementById('search-term').value.trim();
+        const typeFilter = document.getElementById('by_type').value;
+
+        if (locationQuery) {
+            await handleLocationSearch(locationQuery, radius, searchTerm, typeFilter);
+        } else if (searchTerm) {
+            await handleGeneralSearch(searchTerm, typeFilter);
+        } else if (typeFilter) {
+             // If only a type is selected, search by type
+             await handleGeneralSearch(typeFilter, ''); // Search term is the type, no secondary filter
+        } else {
+            resultsInfo.textContent = "Please provide a location or a search term to begin.";
+            resultsInfo.classList.add('error');
+            searchTermInput.classList.add('invalid');
+        }
+        
+        setLoadingState(false);
+    });
+    
+    randomBtn.addEventListener('click', async () => {
+        setLoadingState(true);
+        resultsInfo.textContent = 'Finding a random brewery...';
+        try {
+             const response = await fetch(`${breweryApiBase}/random`);
+             if (!response.ok) throw new Error('Brewery API response not ok.');
+             const brewery = await response.json();
+             resultsInfo.textContent = `✅ Here is a random brewery!`;
+             displayBreweries(brewery);
+        } catch (error) {
+             console.error("Error fetching random brewery:", error);
+             resultsInfo.textContent = "❌ Could not fetch a random brewery.";
+             resultsInfo.classList.add('error');
+        }
+        setLoadingState(false);
     });
 
-    // Initial load for Denver to show some data
+    // Default to Denver results on initial page load
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('location').value = 'Denver, CO';
         document.getElementById('radius').value = 10;
@@ -447,6 +497,5 @@
     });
 
 </script>
-
 </body>
 </html>
