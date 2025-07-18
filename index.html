@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Worldwide Brewery Directory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #bb86fc;
+            --primary-variant: #3700b3;
+            --secondary-color: #03dac6;
+            --text-color: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 2rem;
+        }
+        
+        .site-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .site-header h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .site-header p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+        }
+        
+        .main-container {
+            max-width: 1400px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2.5rem;
+            align-items: start;
+        }
+
+        .controls-panel {
+            position: sticky;
+            top: 2rem;
+            background-color: var(--surface-color);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .controls-panel h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+        }
+        
+        button {
+            width: 100%;
+            padding: 0.85rem;
+            background: linear-gradient(90deg, var(--primary-variant), var(--primary-color));
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-panel {
+            min-height: 80vh;
+        }
+
+        #results-info {
+            padding: 1rem;
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .loader {
+            width: 100%;
+            text-align: center;
+            padding: 3rem;
+            display: none;
+        }
+        
+        .loader.active {
+            display: block;
+        }
+
+        #breweries-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .brewery-card {
+            background-color: var(--surface-color);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .brewery-card h3 {
+            color: var(--secondary-color);
+            font-weight: 600;
+        }
+
+        .brewery-card .distance {
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .brewery-card .address {
+            color: var(--text-muted);
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+
+        .brewery-card .country-info {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        .brewery-card .flag-emoji {
+            font-size: 1.5rem;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        
+        .brewery-card a {
+            display: inline-block;
+            margin-top: 0.5rem;
+            color: var(--secondary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .controls-panel {
+                position: static;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>The Worldwide Brewery Directory</h1>
+        <p>Find your next favorite brewery, anywhere on Earth.</p>
+    </header>
+
+    <main class="main-container">
+        <aside class="controls-panel">
+            <h2>Find Breweries</h2>
+            <form id="search-form">
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" placeholder="City, Zip, or Address" required>
+                </div>
+                <div class="form-group">
+                    <label for="radius">Distance in Miles (Optional)</label>
+                    <input type="number" id="radius" placeholder="e.g., 10">
+                </div>
+                <div class="form-group">
+                    <label for="by_name">Filter by Name (Optional)</label>
+                    <input type="text" id="by_name" placeholder="e.g., Russian River">
+                </div>
+                <div class="form-group">
+                    <label for="by_type">Filter by Type (Optional)</label>
+                    <select id="by_type">
+                        <option value="">Any</option>
+                        <option value="micro">Micro</option>
+                        <option value="nano">Nano</option>
+                        <option value="regional">Regional</option>
+                        <option value="brewpub">Brewpub</option>
+                    </select>
+                </div>
+                <button type="submit" id="search-btn">Search</button>
+            </form>
+        </aside>
+
+        <section class="results-panel">
+            <div id="results-info">Enter a location and hit search to begin.</div>
+            <div class="loader">
+                <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><style>.spinner_DupU{animation:spinner_sM3D 1.2s linear infinite,spinner_E507 1.2s linear infinite}.spinner_GWtZ{animation:spinner_sM3D 1.2s linear infinite,spinner_f7Y2 1.2s linear infinite;animation-delay:.2s}.spinner_dwN6{animation:spinner_sM3D 1.2s linear infinite,spinner_o6b1 1.2s linear infinite;animation-delay:.4s}@keyframes spinner_sM3D{0%,50%{r:4px}100%{r:2px}}@keyframes spinner_E507{0%,50%{cx:7px}100%{cx:5px}}@keyframes spinner_f7Y2{0%,50%{cx:12px}100%{cx:10px}}@keyframes spinner_o6b1{0%,50%{cx:17px}100%{cx:15px}}</style><circle class="spinner_DupU" cx="7" cy="12" r="3" fill="#bb86fc"/><circle class="spinner_GWtZ" cx="12" cy="12" r="3" fill="#bb86fc"/><circle class="spinner_dwN6" cx="17" cy="12" r="3" fill="#bb86fc"/></svg>
+            </div>
+            <div id="breweries-list"></div>
+        </section>
+    </main>
+
+<script>
+    const breweryApiBase = 'https://api.openbrewerydb.org/v1/breweries';
+    // Using Nominatim for geocoding - no API key needed for light use.
+    // See usage policy: https://operations.osmfoundation.org/policies/nominatim/
+    const geocodeApiBase = 'https://nominatim.openstreetmap.org/search';
+    
+    // --- DOM Elements ---
+    const searchForm = document.getElementById('search-form');
+    const searchBtn = document.getElementById('search-btn');
+    const breweriesList = document.getElementById('breweries-list');
+    const resultsInfo = document.getElementById('results-info');
+    const loader = document.querySelector('.loader');
+
+    // --- Utility Functions ---
+
+    /**
+     * Map of country names to ISO 3166-1 alpha-2 codes.
+     * This is not exhaustive but covers common cases in the database.
+     */
+    const countryCodeMap = {
+        "United States": "us", "England": "gb", "Scotland": "gb", "Ireland": "ie",
+        "South Korea": "kr", "Canada": "ca", "France": "fr", "Austria": "at",
+        "Australia": "au", "Poland": "pl", "Portugal": "pt", "Mexico": "mx",
+        "Brazil": "br", "Japan": "jp", "Isle of Man": "im", "New Zealand": "nz"
+    };
+
+    /**
+     * Converts a country name to its corresponding flag emoji.
+     * @param {string} countryName - The full name of the country.
+     * @returns {string} The flag emoji or a globe as a fallback.
+     */
+    function getFlagEmoji(countryName) {
+        const code = countryCodeMap[countryName];
+        if (!code) return '🌍'; // Fallback to globe emoji
+
+        const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
+        return String.fromCodePoint(...codePoints);
+    }
+
+    /**
+     * Calculates the distance between two lat/lon points in miles using the Haversine formula.
+     */
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 3958.8; // Earth's radius in miles
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    /**
+     * Geocodes a location string to latitude and longitude.
+     * @param {string} locationQuery - The user's location input.
+     * @returns {Promise<object|null>} An object with lat, lon, and displayName, or null.
+     */
+    async function geocodeLocation(locationQuery) {
+        const url = `${geocodeApiBase}?q=${encodeURIComponent(locationQuery)}&format=json&limit=1`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Geocoding network response was not ok.');
+            const data = await response.json();
+            if (data && data.length > 0) {
+                return {
+                    lat: parseFloat(data[0].lat),
+                    lon: parseFloat(data[0].lon),
+                    displayName: data[0].display_name
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error("Geocoding Error:", error);
+            return null;
+        }
+    }
+
+    // --- Main Application Logic ---
+
+    const setLoadingState = (isLoading) => {
+        searchBtn.disabled = isLoading;
+        loader.classList.toggle('active', isLoading);
+        if (isLoading) {
+            breweriesList.innerHTML = '';
+        }
+    };
+    
+    const displayBreweries = (breweries, originCoords) => {
+        breweriesList.innerHTML = ''; // Clear previous results
+        if (breweries.length === 0) {
+            breweriesList.innerHTML = '<p>No breweries found matching your criteria.</p>';
+            return;
+        }
+        
+        breweries.forEach(brewery => {
+            const card = document.createElement('div');
+            card.className = 'brewery-card';
+            
+            let distanceHtml = '';
+            if (originCoords && brewery.latitude && brewery.longitude) {
+                const distance = haversineDistance(
+                    originCoords.lat, originCoords.lon,
+                    brewery.latitude, brewery.longitude
+                );
+                distanceHtml = `<p class="distance">~ ${distance.toFixed(1)} miles away</p>`;
+            }
+
+            const flagEmoji = getFlagEmoji(brewery.country);
+            const countryHtml = `
+                <div class="country-info">
+                    <span class="flag-emoji">${flagEmoji}</span>${brewery.country || 'N/A'}
+                </div>`;
+            
+            const websiteHtml = brewery.website_url ?
+                `<a href="${brewery.website_url}" target="_blank" rel="noopener">Visit Website &rarr;</a>` : '';
+
+
+            card.innerHTML = `
+                <h3>${brewery.name}</h3>
+                ${distanceHtml}
+                <p class="address">
+                    ${brewery.address_1 || ''}<br>
+                    ${brewery.city || ''}, ${brewery.state_province || ''} ${brewery.postal_code || ''}<br>
+                    <strong>Type:</strong> <span style="text-transform: capitalize;">${brewery.brewery_type || 'N/A'}</span>
+                </p>
+                ${countryHtml}
+                ${websiteHtml}
+            `;
+            breweriesList.appendChild(card);
+        });
+    };
+
+    searchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setLoadingState(true);
+
+        const locationQuery = document.getElementById('location').value;
+        const radius = parseFloat(document.getElementById('radius').value);
+        const nameFilter = document.getElementById('by_name').value;
+        const typeFilter = document.getElementById('by_type').value;
+
+        resultsInfo.textContent = `Finding coordinates for "${locationQuery}"...`;
+        const originCoords = await geocodeLocation(locationQuery);
+
+        if (!originCoords) {
+            resultsInfo.textContent = `❌ Could not find location: "${locationQuery}". Please try a different search.`;
+            setLoadingState(false);
+            return;
+        }
+        
+        resultsInfo.textContent = `Found "${originCoords.displayName}". Searching for nearby breweries...`;
+
+        const params = new URLSearchParams({
+            by_dist: `${originCoords.lat},${originCoords.lon}`,
+            per_page: 200
+        });
+        if(nameFilter) params.append('by_name', nameFilter);
+        if(typeFilter) params.append('by_type', typeFilter);
+
+        try {
+            const response = await fetch(`${breweryApiBase}?${params.toString()}`);
+            if (!response.ok) throw new Error('Brewery API network response was not ok.');
+            let breweries = await response.json();
+            
+            let filteredBreweries = breweries;
+            if (!isNaN(radius) && radius > 0) {
+                 filteredBreweries = breweries.filter(b => {
+                    if (!b.latitude || !b.longitude) return false;
+                    const distance = haversineDistance(originCoords.lat, originCoords.lon, b.latitude, b.longitude);
+                    return distance <= radius;
+                });
+            }
+            
+            let infoText = `Showing ${filteredBreweries.length} results`;
+            if (nameFilter) infoText += ` with "${nameFilter}" in the name`;
+            if (!isNaN(radius) && radius > 0) infoText += ` within ${radius} miles of`;
+            else infoText += ` nearest to`;
+            infoText += ` "${originCoords.displayName.split(',')[0]}"`;
+
+            resultsInfo.textContent = `✅ ${infoText}.`;
+            displayBreweries(filteredBreweries, originCoords);
+
+        } catch (error) {
+            console.error("Error fetching breweries:", error);
+            resultsInfo.textContent = "❌ An error occurred while fetching brewery data.";
+        } finally {
+            setLoadingState(false);
+        }
+    });
+
+    // Initial load for Denver to show some data
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('location').value = 'Denver, CO';
+        document.getElementById('radius').value = 10;
+        searchBtn.click();
+    });
+
+</script>
+
+</body>
+</html>
